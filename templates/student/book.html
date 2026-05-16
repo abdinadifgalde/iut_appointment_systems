@@ -1,0 +1,261 @@
+{% extends "layout.html" %}
+{% block styles %}
+<style>
+.slot-container { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; margin-top:15px; }
+.slot-item { padding:12px; border:2px solid #e9ecef; border-radius:10px; text-align:center; cursor:pointer; transition:all .2s; font-weight:500; font-size:.85rem; }
+.slot-item:hover:not(.disabled) { border-color:var(--primary-color); background:#f0f3ff; transform:translateY(-2px); }
+.slot-item.selected { border-color:var(--primary-color); background:var(--primary-color); color:#fff; box-shadow:0 0 10px rgba(67,97,238,.3); }
+.slot-item.disabled { background:#f1f3f5; color:#adb5bd; cursor:not-allowed; border-color:#e9ecef; }
+
+/* Calendar */
+.mini-cal { border-radius:12px; overflow:hidden; border:1px solid #dee2e6; }
+.cal-header { background:var(--primary-color); color:#fff; padding:10px 14px; display:flex; justify-content:space-between; align-items:center; }
+.cal-grid { display:grid; grid-template-columns:repeat(7,1fr); }
+.cal-day-name { text-align:center; padding:6px 2px; font-size:.7rem; font-weight:600; color:#888; background:#f8f9fa; }
+.cal-day { text-align:center; padding:6px 2px; font-size:.78rem; cursor:pointer; border:1px solid transparent; transition:.15s; }
+.cal-day.available:hover { background:#e8edff; border-color:var(--primary-color); border-radius:6px; }
+.cal-day.selected-day { background:var(--primary-color); color:#fff; border-radius:6px; }
+.cal-day.unavailable { color:#dc3545; text-decoration:line-through; cursor:default; }
+.cal-day.off { color:#adb5bd; cursor:default; }
+.cal-day.full { color:#fd7e14; cursor:default; }
+.cal-day.past { color:#ccc; cursor:default; }
+.cal-day.empty { cursor:default; }
+.cal-legend { display:flex; flex-wrap:wrap; gap:8px; padding:8px 12px; font-size:.72rem; }
+.cal-legend span::before { content:'●'; margin-right:3px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-10">
+    <div class="card p-4">
+      <h2 class="fw-bold mb-4"><i class="fas fa-calendar-plus me-2 text-primary"></i>Book Appointment</h2>
+      <form id="bookingForm" method="POST">
+        {{ form.hidden_tag() }}
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            {{ form.student_name.label(class="form-label") }}
+            {{ form.student_name(class="form-control", value=current_user.name) }}
+          </div>
+          <div class="col-md-6 mb-3">
+            {{ form.student_id_num.label(class="form-label") }}
+            {{ form.student_id_num(class="form-control", placeholder="e.g. 220041xxx") }}
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            {{ form.department.label(class="form-label") }}
+            {{ form.department(class="form-control", placeholder="e.g. CSE") }}
+          </div>
+          <div class="col-md-6 mb-3">
+            {{ form.officer.label(class="form-label") }}
+            {{ form.officer(class="form-select", id="officerSelect") }}
+          </div>
+        </div>
+
+        <!-- Calendar view -->
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Select Date</label>
+          <div class="row align-items-start">
+            <div class="col-md-5">
+              <div class="mini-cal mb-2">
+                <div class="cal-header">
+                  <button type="button" class="btn btn-sm btn-link text-white p-0" id="prevMonth"><i class="fas fa-chevron-left"></i></button>
+                  <span id="calTitle" class="fw-semibold"></span>
+                  <button type="button" class="btn btn-sm btn-link text-white p-0" id="nextMonth"><i class="fas fa-chevron-right"></i></button>
+                </div>
+                <div class="cal-grid" id="calDayNames"></div>
+                <div class="cal-grid" id="calGrid"></div>
+                <div class="cal-legend">
+                  <span style="color:#4361ee">Available</span>
+                  <span style="color:#dc3545">Unavailable</span>
+                  <span style="color:#fd7e14">Full</span>
+                  <span style="color:#adb5bd">Off day</span>
+                </div>
+              </div>
+              {{ form.date(class="d-none", id="dateInput") }}
+            </div>
+            <div class="col-md-7">
+              <label class="form-label fw-semibold">Select Time Slot</label>
+              <div id="slotsContainer" class="slot-container">
+                <p class="text-muted small">Select officer and date first.</p>
+              </div>
+              {{ form.time(class="d-none", id="timeInput") }}
+              {% for e in form.time.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+            </div>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          {{ form.issue.label(class="form-label") }}
+          {{ form.issue(class="form-control", rows="3", placeholder="Briefly describe the reason for your appointment") }}
+        </div>
+
+        <div class="d-grid mt-4">
+          <button type="button" class="btn btn-primary" id="confirmBtn">Book Appointment</button>
+        </div>
+
+        <!-- Confirm modal -->
+        <div class="modal fade" id="confirmModal" tabindex="-1">
+          <div class="modal-dialog">
+            <div class="modal-content">
+              <div class="modal-header"><h5 class="modal-title">Confirm Booking</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+              <div class="modal-body" id="confirmDetails"></div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Edit</button>
+                {{ form.submit(class="btn btn-primary") }}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Waitlist modal -->
+        {% if suggest_waitlist %}
+        <div class="modal fade show d-block" id="waitlistModal" tabindex="-1" style="background:rgba(0,0,0,.5)">
+          <div class="modal-dialog">
+            <div class="modal-content">
+              <div class="modal-header bg-warning">
+                <h5 class="modal-title"><i class="fas fa-clock me-2"></i>Slot Taken — Join Waitlist?</h5>
+              </div>
+              <div class="modal-body">
+                <p>That slot is already booked. Join the waitlist and we'll automatically book you if it opens up.</p>
+                <form method="POST" action="{{ url_for('student.join_waitlist', appointment_id=waitlist_apt_id) }}">
+                  {{ form.hidden_tag() }}
+                  <input type="hidden" name="student_id_num" value="{{ form.student_id_num.data }}">
+                  <input type="hidden" name="department" value="{{ form.department.data }}">
+                  <input type="hidden" name="issue" value="{{ form.issue.data }}">
+                  <div class="d-flex gap-2 mt-3">
+                    <button type="submit" class="btn btn-warning">Join Waitlist</button>
+                    <a href="{{ url_for('student.book_appointment') }}" class="btn btn-outline-secondary">Pick Another Slot</a>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const officerSelect = document.getElementById('officerSelect');
+const dateInput = document.getElementById('dateInput');
+const slotsContainer = document.getElementById('slotsContainer');
+const timeInput = document.getElementById('timeInput');
+const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
+
+let calYear = new Date().getFullYear();
+let calMonth = new Date().getMonth();
+let calData = {};
+
+const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+document.getElementById('calDayNames').innerHTML = dayNames.map(d=>`<div class="cal-day-name">${d}</div>`).join('');
+
+function renderCalendar() {
+    const title = new Date(calYear, calMonth, 1).toLocaleString('default', {month:'long', year:'numeric'});
+    document.getElementById('calTitle').textContent = title;
+    const grid = document.getElementById('calGrid');
+    grid.innerHTML = '';
+    const firstDay = new Date(calYear, calMonth, 1).getDay();
+    const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+    for (let i=0;i<firstDay;i++) grid.innerHTML += `<div class="cal-day empty"></div>`;
+    for (let d=1;d<=daysInMonth;d++) {
+        const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const info = calData[dateStr];
+        let cls = 'cal-day';
+        let title2 = '';
+        if (!info) cls += ' off';
+        else if (info==='past') cls += ' past';
+        else if (info==='unavailable') { cls += ' unavailable'; title2='Unavailable'; }
+        else if (info==='off') { cls += ' off'; title2='Off day'; }
+        else if (info==='full') { cls += ' full'; title2='Fully booked'; }
+        else if (info==='available') cls += ' available';
+        const sel = dateInput.value === dateStr ? ' selected-day' : '';
+        grid.innerHTML += `<div class="cal-day${cls.replace('cal-day','')}${sel}" data-date="${dateStr}" title="${title2}">${d}</div>`;
+    }
+    grid.querySelectorAll('.cal-day.available, .cal-day.available.selected-day').forEach(el => {
+        el.addEventListener('click', ()=>{
+            document.querySelectorAll('.cal-day').forEach(x=>x.classList.remove('selected-day'));
+            el.classList.add('selected-day');
+            dateInput.value = el.dataset.date;
+            updateSlots();
+        });
+    });
+}
+
+function loadCalendar() {
+    const officer = officerSelect.value;
+    if (!officer) return;
+    fetch(`/api/calendar?officer=${officer}&year=${calYear}&month=${calMonth+1}`)
+        .then(r=>r.json()).then(data=>{
+            calData = {};
+            data.forEach(item => calData[item.date] = item.status);
+            renderCalendar();
+        });
+}
+
+document.getElementById('prevMonth').addEventListener('click', ()=>{ calMonth--; if(calMonth<0){calMonth=11;calYear--;} loadCalendar(); });
+document.getElementById('nextMonth').addEventListener('click', ()=>{ calMonth++; if(calMonth>11){calMonth=0;calYear++;} loadCalendar(); });
+
+function updateSlots() {
+    const officer = officerSelect.value;
+    const date = dateInput.value;
+    if (!officer || !date) return;
+    slotsContainer.innerHTML = '<div class="text-center w-100 py-3"><div class="spinner-border spinner-border-sm text-primary"></div></div>';
+    fetch(`/api/slots?officer=${officer}&date=${date}`)
+        .then(r=>r.json()).then(data=>{
+            slotsContainer.innerHTML = '';
+            timeInput.value = '';
+            if (data.unavailable) {
+                slotsContainer.innerHTML = `<div class="alert alert-danger w-100 mb-0 small">
+                    <i class="fas fa-ban me-1"></i><strong>${data.officer_name} is unavailable</strong>
+                    (${data.start_date} – ${data.end_date})<br>Reason: ${data.reason}</div>`;
+                return;
+            }
+            if (data.limit_reached) {
+                slotsContainer.innerHTML = `<div class="alert alert-warning w-100 mb-0 small">
+                    <i class="fas fa-exclamation-triangle me-1"></i>Daily appointment limit reached for this officer.</div>`;
+                return;
+            }
+            if (!data.slots || data.slots.length===0) {
+                slotsContainer.innerHTML = '<p class="text-muted small">No slots for this date.</p>';
+                return;
+            }
+            data.slots.forEach(slot => {
+                const div = document.createElement('div');
+                div.className = 'slot-item' + (slot.available ? '' : ' disabled');
+                div.textContent = slot.time;
+                if (slot.available) {
+                    div.addEventListener('click', ()=>{
+                        document.querySelectorAll('.slot-item').forEach(s=>s.classList.remove('selected'));
+                        div.classList.add('selected');
+                        timeInput.value = slot.time;
+                    });
+                }
+                slotsContainer.appendChild(div);
+            });
+        });
+}
+
+officerSelect.addEventListener('change', ()=>{ loadCalendar(); updateSlots(); });
+
+document.getElementById('confirmBtn').addEventListener('click', ()=>{
+    if (!timeInput.value) { alert('Please select a time slot.'); return; }
+    document.getElementById('confirmDetails').innerHTML = `
+        <p><strong>Officer:</strong> ${officerSelect.options[officerSelect.selectedIndex].text}</p>
+        <p><strong>Date:</strong> ${dateInput.value}</p>
+        <p><strong>Time:</strong> ${timeInput.value}</p>
+        <p><strong>Reason:</strong> ${document.querySelector('textarea').value}</p>
+        <p class="text-muted small mb-0">By confirming you agree to attend at the scheduled time.</p>`;
+    confirmModal.show();
+});
+
+// Init calendar
+renderCalendar();
+</script>
+{% endblock %}

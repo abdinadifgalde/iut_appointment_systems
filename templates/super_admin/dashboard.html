@@ -1,0 +1,179 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h1 class="display-4">Super Admin Dashboard</h1>
+            <p class="text-muted">System Overview & Management</p>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Total Users</h5>
+                    <h2>{{ total_users }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Students</h5>
+                    <h2>{{ total_students }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Officers</h5>
+                    <h2>{{ total_officers }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Admins</h5>
+                    <h2>{{ total_admins }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Appointments Overview -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Appointment Statistics</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <p class="mb-1">Total Appointments</p>
+                        <h3>{{ total_appointments }}</h3>
+                    </div>
+                    <div>
+                        <p class="mb-1">Pending Approval</p>
+                        <h3 class="text-warning">{{ pending_appointments }}</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <a href="{{ url_for('super_admin.create_officer') }}" class="btn btn-primary btn-sm mb-2 w-100">
+                        <i class="fas fa-user-plus"></i> Create Officer Account
+                    </a>
+                    <a href="{{ url_for('super_admin.create_admin') }}" class="btn btn-warning btn-sm mb-2 w-100">
+                        <i class="fas fa-user-tie"></i> Create Admin Account
+                    </a>
+                    <a href="{{ url_for('super_admin.manage_users') }}" class="btn btn-info btn-sm mb-2 w-100">
+                        <i class="fas fa-users"></i> Manage All Users
+                    </a>
+                    <a href="{{ url_for('super_admin.audit_log') }}" class="btn btn-secondary btn-sm w-100">
+                        <i class="fas fa-history"></i> View Audit Log
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Recent System Activity</h5>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Admin</th>
+                                <th>Action</th>
+                                <th>Details</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if recent_logs %}
+                                {% for log in recent_logs %}
+                                <tr>
+                                    <td>{{ log.admin.name }}</td>
+                                    <td><span class="badge bg-info">{{ log.action }}</span></td>
+                                    <td>{{ log.detail[:50] }}{% if log.detail|length > 50 %}...{% endif %}</td>
+                                    <td>{{ log.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted">No recent activity</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Management Sections -->
+    <div class="row mt-4">
+        <div class="col-md-4 mb-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="fas fa-user-tie"></i> Officer Management</h5>
+                    <p class="card-text text-muted">Create, manage, and deactivate officer accounts</p>
+                    <a href="{{ url_for('super_admin.manage_officers') }}" class="btn btn-sm btn-outline-primary">
+                        Manage Officers
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="fas fa-shield-alt"></i> Admin Management</h5>
+                    <p class="card-text text-muted">Create, manage, and deactivate admin accounts</p>
+                    <a href="{{ url_for('super_admin.manage_admins') }}" class="btn btn-sm btn-outline-warning">
+                        Manage Admins
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="fas fa-cog"></i> System Settings</h5>
+                    <p class="card-text text-muted">Configure system-wide settings and preferences</p>
+                    <a href="{{ url_for('super_admin.system_settings') }}" class="btn btn-sm btn-outline-secondary">
+                        Settings
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .card {
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        border: none;
+    }
+    .card-header {
+        border-bottom: 1px solid #e9ecef;
+    }
+    .display-4 {
+        font-weight: 600;
+    }
+</style>
+{% endblock %}

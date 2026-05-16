@@ -1,0 +1,114 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h2>Admin Management</h2>
+            <p class="text-muted">Create, manage, and monitor admin accounts</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <a href="{{ url_for('super_admin.create_admin') }}" class="btn btn-warning">
+                <i class="fas fa-user-plus"></i> Create New Admin
+            </a>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Department</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if admins.items %}
+                        {% for admin in admins.items %}
+                        <tr>
+                            <td><strong>{{ admin.name }}</strong></td>
+                            <td>{{ admin.email }}</td>
+                            <td>{{ admin.department or '-' }}</td>
+                            <td>
+                                {% if admin.is_active %}
+                                    <span class="badge bg-success">Active</span>
+                                {% else %}
+                                    <span class="badge bg-danger">Inactive</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ admin.created_at.strftime('%Y-%m-%d') }}</td>
+                            <td>
+                                {% if admin.is_active %}
+                                    <form method="POST" action="{{ url_for('super_admin.deactivate_admin', admin_id=admin.id) }}" style="display:inline;">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-warning" onclick="return confirm('Deactivate this admin?')">
+                                            <i class="fas fa-ban"></i> Deactivate
+                                        </button>
+                                    </form>
+                                {% else %}
+                                    <form method="POST" action="{{ url_for('super_admin.activate_admin', admin_id=admin.id) }}" style="display:inline;">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-success">
+                                            <i class="fas fa-check"></i> Activate
+                                        </button>
+                                    </form>
+                                {% endif %}
+                                <a href="{{ url_for('super_admin.reset_user_password', user_id=admin.id) }}" class="btn btn-sm btn-info">
+                                    <i class="fas fa-key"></i> Reset Password
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-4">
+                                No admins found. <a href="{{ url_for('super_admin.create_admin') }}">Create one now</a>
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% if admins.pages > 1 %}
+    <nav aria-label="Page navigation" class="mt-4">
+        <ul class="pagination justify-content-center">
+            {% if admins.has_prev %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('super_admin.manage_admins', page=admins.prev_num) }}">Previous</a>
+                </li>
+            {% endif %}
+            {% for page_num in admins.iter_pages() %}
+                {% if page_num %}
+                    <li class="page-item {{ 'active' if page_num == admins.page else '' }}">
+                        <a class="page-link" href="{{ url_for('super_admin.manage_admins', page=page_num) }}">{{ page_num }}</a>
+                    </li>
+                {% endif %}
+            {% endfor %}
+            {% if admins.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('super_admin.manage_admins', page=admins.next_num) }}">Next</a>
+                </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}
